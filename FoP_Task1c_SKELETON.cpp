@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------
-//Program: Skeleton for Task 1c – group assignment
+//Program: Skeleton for Task 1c â€“ group assignment
 //Author: Pascale Vacher
 //Last updated: 26 February 2018
 //---------------------------------------------------------------------------
@@ -28,8 +28,8 @@ using namespace std;
 //---------------------------------------------------------------------------
 
 //defining the size of the grid
-const int  SIZEX(10);    	//horizontal dimension
-const int  SIZEY(8);		//vertical dimension
+const int  SIZEX(20);    	//horizontal dimension
+const int  SIZEY(16);		//vertical dimension
 //defining symbols used for display of the grid and content
 const char SPOT('@');   	//spot
 const char TUNNEL(' ');    	//tunnel
