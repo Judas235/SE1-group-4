@@ -28,8 +28,8 @@ using namespace std;
 //---------------------------------------------------------------------------
 
 //defining the size of the grid
-const int  SIZEX(20);    	//horizontal dimension
-const int  SIZEY(16);		//vertical dimension
+const int  SIZEX(25);    	//horizontal dimension
+const int  SIZEY(15);		//vertical dimension
 //defining symbols used for display of the grid and content
 const char SPOT('@');   	//spot
 const char TUNNEL(' ');    	//tunnel
