@@ -22,6 +22,7 @@ using namespace std;
 //include our own libraries
 #include "RandomUtils.h"    //for Seed, Random
 #include "ConsoleUtils.h"	//for Clrscr, Gotoxy, etc.
+#include "TimeUtils.h"		//For time related functions
 
 //---------------------------------------------------------------------------
 //----- define constants
@@ -34,6 +35,7 @@ const int  SIZEY(15);		//vertical dimension
 const char SPOT('@');   	//spot
 const char TUNNEL(' ');    	//tunnel
 const char WALL('#');    	//border
+const char HOLE('0');		//hole
 //defining the command letters to move the spot on the maze
 const int  UP(72);			//up arrow
 const int  DOWN(80); 		//down arrow
@@ -67,6 +69,7 @@ int main()
 	char grid[SIZEY][SIZEX];			//grid for display
 	char maze[SIZEY][SIZEX];			//structure of the maze
 	Item spot = { 0, 0, SPOT }; 		//spot's position and symbol
+	Item Holes[12];						//Holes array
 	string message("LET'S START...");	//current message to player
 
 	//action...
@@ -119,14 +122,21 @@ void setInitialMazeStructure(char maze[][SIZEX])
 //TODO: initial maze configuration should be amended (size changed and inner walls removed)
   //initialise maze configuration
 	char initialMaze[SIZEY][SIZEX] 	//local array to store the maze structure
-		= { { '#', '#', '#', '#', '#', '#', '#', '#', '#', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', '#', ' ', ' ', '#', ' ', ' ', '#' },
-		{ '#', ' ', ' ', '#', ' ', ' ', '#', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', '#', '#', '#', '#', '#', '#', '#', '#', '#' } };
+		= { { '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+		{ '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#' } };		
 	//with '#' for wall, ' ' for tunnel, etc. 
 	//copy into maze structure with appropriate symbols
 	for (int row(0); row < SIZEY; ++row)
@@ -137,6 +147,18 @@ void setInitialMazeStructure(char maze[][SIZEX])
 			case '#': maze[row][col] = WALL; break;
 			case ' ': maze[row][col] = TUNNEL; break;
 			}
+	//Loop for each Hole that will be placed
+	for (int i = 0; i < 12; i++)
+	{
+		int randomx = Random(SIZEX - 2);//get a random x value
+		int randomy = Random(SIZEY - 2);//get a random y value
+		while(maze[randomx][randomy] != TUNNEL)//Make sure the random X,y are over a tunnel and nothing else
+		{
+			randomx = Random(SIZEX - 2);
+			randomy = Random(SIZEY - 2);
+		}		
+		maze[randomx][randomy] = HOLE; //when it is above a tunnel, replace with a hole
+	}
 }
 
 //---------------------------------------------------------------------------
@@ -150,6 +172,7 @@ void updateGrid(char grid[][SIZEX], const char maze[][SIZEX], const Item spot)
 
 	setMaze(grid, maze);	//reset the empty maze configuration into grid
 	placeItem(grid, spot);	//set spot in grid
+	//Set random 
 }
 
 void setMaze(char grid[][SIZEX], const char maze[][SIZEX])
@@ -188,9 +211,12 @@ void updateGameData(const char g[][SIZEX], Item& spot, const int key, string& me
 		spot.x += dx;	//go in that X direction
 		break;
 	case WALL:  		//hit a wall and stay there
-//TODO: remove alarm when bumping into walls - too annoying
-		cout << '\a';	//beep the alarm
 		mess = "CANNOT GO THERE!";
+		break;
+	case HOLE:
+		mess = "SPOT FELL INTO A HOLE";
+		spot.y += dy;	//go in that Y direction
+		spot.x += dx;	//go in that X direction
 		break;
 	}
 }
@@ -199,7 +225,6 @@ void updateGameData(const char g[][SIZEX], Item& spot, const int key, string& me
 //---------------------------------------------------------------------------
 void setKeyDirection(const int key, int& dx, int& dy)
 { //calculate direction indicated by key
-//TODO: UP and DOWN arrow keys should work
 	bool isArrowKey(const int k);
 	assert(isArrowKey(key));
 	switch (key)	//...depending on the selected key...
@@ -211,6 +236,14 @@ void setKeyDirection(const int key, int& dx, int& dy)
 	case RIGHT: 	//when RIGHT arrow pressed...
 		dx = +1;	//increase the X coordinate
 		dy = 0;
+		break;
+	case UP:        //when UP arrow pressed...
+		dx = 0;		
+		dy = -1;	//Decrease the Y coordinate
+		break;
+	case DOWN:		//when the DOWN arrow pressed...
+		dx = 0;
+		dy = 1;		//Increase the Y coordinate
 		break;
 	}
 }
@@ -263,15 +296,13 @@ void paintGame(const char g[][SIZEX], string mess)
 	string tostring(char x);
 	void showMessage(const WORD backColour, const WORD textColour, int x, int y, const string message);
 	void paintGrid(const char g[][SIZEX]);
-//TODO: Change the colour of the messages
 	//display game title
-	showMessage(clBlack, clYellow, 0, 0, "___GAME___");
-//TODO: Date and time should be displayed from the system
-	showMessage(clWhite, clRed, 40, 0, "FoP Task 1c: February 2018");
+	showMessage(clGreen, clRed, 0, 0, "___GAME___");
+	showMessage(clRed, clYellow, 40, 0, GetDate() + GetTime());
 
 	//display menu options available
-	showMessage(clRed, clYellow, 40, 3, "TO MOVE USE KEYBOARD ARROWS ");
-	showMessage(clRed, clYellow, 40, 4, "TO QUIT ENTER 'Q'           ");
+	showMessage(clWhite, clBlack, 40, 3, "TO MOVE USE KEYBOARD ARROWS ");
+	showMessage(clWhite, clBlack, 40, 4, "TO QUIT ENTER 'Q'           ");
 
 	//print auxiliary messages if any
 	showMessage(clBlack, clWhite, 40, 8, mess);	//display current message
