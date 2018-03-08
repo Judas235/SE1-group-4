@@ -57,11 +57,12 @@ int main()
 {
 	//function declarations (prototypes)
 	void initialiseGame(char g[][SIZEX], char m[][SIZEX], Item& spot);
-	void paintGame(const char g[][SIZEX], string mess);
+	void paintGame(const char g[][SIZEX], string mess, int Lives);
 	bool wantsToQuit(const int key);
+	void updateLives(int& currentLives, int Change);
 	bool isArrowKey(const int k);
 	int  getKeyPress();
-	void updateGameData(const char g[][SIZEX], Item& spot, const int key, string& mess);
+	void updateGameData(const char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives);
 	void updateGrid(char g[][SIZEX], const char m[][SIZEX], const Item spot);
 	void endProgram();
 
@@ -71,24 +72,25 @@ int main()
 	Item spot = { 0, 0, SPOT }; 		//spot's position and symbol
 	Item Holes[12];						//Holes array
 	string message("LET'S START...");	//current message to player
+	int Lives(3);
 
 	//action...
 	Seed();								//seed the random number generator
 	SetConsoleTitle("Spot and Zombies Game - FoP 2017-18");
 	initialiseGame(grid, maze, spot);	//initialise grid (incl. walls and spot)
-	paintGame(grid, message);			//display game info, modified grid and messages
+	paintGame(grid, message, Lives);			//display game info, modified grid and messages
 	int key;							//current key selected by player
 	do {
 		//TODO: command letters should not be case sensitive
 		key = getKeyPress(); 	//read in  selected key: arrow or letter command
 		if (isArrowKey(key))
 		{
-			updateGameData(grid, spot, key, message);		//move spot in that direction
+			updateGameData(grid, spot, key, message, Lives);		//move spot in that direction
 			updateGrid(grid, maze, spot);					//update grid information
 		}
 		else
 			message = "INVALID KEY!";	//set 'Invalid key' message
-		paintGame(grid, message);		//display game info, modified grid and messages
+		paintGame(grid, message, Lives);		//display game info, modified grid and messages
 	} while (!wantsToQuit(key));		//while user does not want to quit
 	endProgram();						//display final message
 	return 0;
@@ -165,6 +167,11 @@ void setInitialMazeStructure(char maze[][SIZEX])
 //----- update grid state
 //---------------------------------------------------------------------------
 
+void updateLives(int& currentLives, int Change)
+{
+	currentLives += Change;
+}
+
 void updateGrid(char grid[][SIZEX], const char maze[][SIZEX], const Item spot)
 { //update grid configuration after each move
 	void setMaze(char g[][SIZEX], const char b[][SIZEX]);
@@ -190,10 +197,11 @@ void placeItem(char g[][SIZEX], const Item item)
 //---------------------------------------------------------------------------
 //----- move items on the grid
 //---------------------------------------------------------------------------
-void updateGameData(const char g[][SIZEX], Item& spot, const int key, string& mess)
+void updateGameData(const char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives)
 { //move spot in required direction
 	bool isArrowKey(const int k);
 	void setKeyDirection(int k, int& dx, int& dy);
+	void updateLives(int& currentLives, int Change);
 	assert(isArrowKey(key));
 
 	//reset message to blank
@@ -217,6 +225,7 @@ void updateGameData(const char g[][SIZEX], Item& spot, const int key, string& me
 		mess = "SPOT FELL INTO A HOLE";
 		spot.y += dy;	//go in that Y direction
 		spot.x += dx;	//go in that X direction
+		updateLives(Lives, -1);
 		break;
 	}
 }
@@ -291,7 +300,7 @@ void showMessage(const WORD backColour, const WORD textColour, int x, int y, con
 	SelectTextColour(textColour);
 	cout << message;
 }
-void paintGame(const char g[][SIZEX], string mess)
+void paintGame(const char g[][SIZEX], string mess, int Lives)
 { //display game title, messages, maze, spot and other items on screen
 	string tostring(char x);
 	void showMessage(const WORD backColour, const WORD textColour, int x, int y, const string message);
@@ -306,6 +315,10 @@ void paintGame(const char g[][SIZEX], string mess)
 
 	//print auxiliary messages if any
 	showMessage(clBlack, clWhite, 40, 8, mess);	//display current message
+
+	//print current lives
+	string s = to_string(Lives);
+	showMessage(clBlack, clWhite, 40, 10, "Lives: " + s);
 
 //TODO: Show your course, your group number and names on screen
 
