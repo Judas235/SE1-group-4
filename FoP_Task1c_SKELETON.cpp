@@ -36,6 +36,7 @@ const char SPOT('@');   	//spot
 const char TUNNEL(' ');    	//tunnel
 const char WALL('#');    	//border
 const char HOLE('0');		//hole
+const char PILL('*');		//pill
 //defining the command letters to move the spot on the maze
 const int  UP(72);			//up arrow
 const int  DOWN(80); 		//down arrow
@@ -55,6 +56,7 @@ struct Item {
 
 int main()
 {
+	system("color 8a");
 	//function declarations (prototypes)
 	void initialiseGame(char g[][SIZEX], char m[][SIZEX], Item& spot);
 	void paintGame(const char g[][SIZEX], string mess, int Lives);
@@ -62,7 +64,7 @@ int main()
 	void updateLives(int& currentLives, int Change);
 	bool isArrowKey(const int k);
 	int  getKeyPress();
-	void updateGameData(const char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives);
+	void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives);
 	void updateGrid(char g[][SIZEX], const char m[][SIZEX], const Item spot);
 	void endProgram();
 
@@ -85,8 +87,15 @@ int main()
 		key = getKeyPress(); 	//read in  selected key: arrow or letter command
 		if (isArrowKey(key))
 		{
-			updateGameData(grid, spot, key, message, Lives);		//move spot in that direction
-			updateGrid(grid, maze, spot);					//update grid information
+			if (Lives <= 0)
+			{				
+				key = 'Q';
+			}
+			else
+			{
+				updateGameData(grid, spot, key, message, Lives);		//move spot in that direction
+				updateGrid(grid, maze, spot);					//update grid information
+			}			
 		}
 		else
 			message = "INVALID KEY!";	//set 'Invalid key' message
@@ -95,7 +104,6 @@ int main()
 	endProgram();						//display final message
 	return 0;
 }
-
 
 //---------------------------------------------------------------------------
 //----- initialise game state
@@ -161,6 +169,18 @@ void setInitialMazeStructure(char maze[][SIZEX])
 		}		
 		maze[randomx][randomy] = HOLE; //when it is above a tunnel, replace with a hole
 	}
+	//Loop through for each pill
+	for (int k = 0; k < 8; k++)
+	{
+		int randomx = Random(SIZEX - 2);//get a random x value
+		int randomy = Random(SIZEY - 2);//get a random y value
+		while (maze[randomx][randomy] != TUNNEL || maze[randomx][randomy] == HOLE)//Make sure the random X,y are over a tunnel and nothing else
+		{
+			randomx = Random(SIZEX - 2);
+			randomy = Random(SIZEY - 2);
+		}
+		maze[randomx][randomy] = PILL; //when it is above a tunnel, replace with a hole
+	}
 }
 
 //---------------------------------------------------------------------------
@@ -171,6 +191,7 @@ void updateLives(int& currentLives, int Change)
 {
 	currentLives += Change;
 }
+
 
 void updateGrid(char grid[][SIZEX], const char maze[][SIZEX], const Item spot)
 { //update grid configuration after each move
@@ -197,11 +218,11 @@ void placeItem(char g[][SIZEX], const Item item)
 //---------------------------------------------------------------------------
 //----- move items on the grid
 //---------------------------------------------------------------------------
-void updateGameData(const char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives)
+void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives) //Changed g to not a constant, so we can update the space to a tunnel
 { //move spot in required direction
 	bool isArrowKey(const int k);
 	void setKeyDirection(int k, int& dx, int& dy);
-	void updateLives(int& currentLives, int Change);
+	void updateLives(int& currentLives, int Change);	
 	assert(isArrowKey(key));
 
 	//reset message to blank
@@ -226,6 +247,13 @@ void updateGameData(const char g[][SIZEX], Item& spot, const int key, string& me
 		spot.y += dy;	//go in that Y direction
 		spot.x += dx;	//go in that X direction
 		updateLives(Lives, -1);
+		break;
+	case PILL:
+		mess = "SPOT ATE A PILL";
+		spot.y += dy;	//go in that Y direction
+		spot.x += dx;	//go in that X direction
+		updateLives(Lives, 1);
+		g[spot.x][spot.y] = SPOT;
 		break;
 	}
 }
@@ -306,8 +334,8 @@ void paintGame(const char g[][SIZEX], string mess, int Lives)
 	void showMessage(const WORD backColour, const WORD textColour, int x, int y, const string message);
 	void paintGrid(const char g[][SIZEX]);
 	//display game title
-	showMessage(clGreen, clRed, 0, 0, "___GAME___");
-	showMessage(clRed, clYellow, 40, 0, GetDate() + GetTime());
+	showMessage(clDarkGrey, clYellow, 0, 0, "___GAME___");
+	showMessage(clGrey, clYellow, 40, 0, GetDate() + GetTime());
 
 	//display menu options available
 	showMessage(clWhite, clBlack, 40, 3, "TO MOVE USE KEYBOARD ARROWS ");
@@ -334,7 +362,29 @@ void paintGrid(const char g[][SIZEX])
 	for (int row(0); row < SIZEY; ++row)
 	{
 		for (int col(0); col < SIZEX; ++col)
-			cout << g[row][col];	//output cell content
+			switch (g[row][col])
+			{
+			case HOLE:
+				SelectTextColour(clRed);
+				cout << g[row][col];
+				break;
+			case PILL:
+				SelectTextColour(clYellow);
+				cout << g[row][col];
+				break;
+			case WALL:
+				SelectTextColour(clWhite);
+				cout << g[row][col];
+				break;
+			case TUNNEL:
+				cout << g[row][col];
+				break;
+			case SPOT:
+				SelectTextColour(clWhite);
+				cout << g[row][col];
+				break;
+			}
+			//cout << g[row][col];	//output cell content
 		cout << endl;
 	}
 }
@@ -343,5 +393,7 @@ void endProgram()
 {
 	void showMessage(const WORD backColour, const WORD textColour, int x, int y, const string message);
 	showMessage(clRed, clYellow, 40, 8, "");	
+	showMessage(clGrey, clRed, 40, 11, "GAME OVER");
+	Gotoxy(40, 15);
 	system("pause");	//hold output screen until a keyboard key is hit
 }
