@@ -65,7 +65,7 @@ int main()
 	bool isArrowKey(const int k);
 	int  getKeyPress();
 	void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives);
-	void updateGrid(char g[][SIZEX], const char m[][SIZEX], const Item spot);
+	void updateGrid(char g[][SIZEX], char m[][SIZEX], const Item spot);
 	void endProgram();
 
 	//local variable declarations 
@@ -94,6 +94,8 @@ int main()
 			else
 			{
 				updateGameData(grid, spot, key, message, Lives);		//move spot in that direction
+				Gotoxy(40, 20);
+				cout << grid[spot.y][spot.x];
 				updateGrid(grid, maze, spot);					//update grid information
 			}			
 		}
@@ -113,7 +115,7 @@ void initialiseGame(char grid[][SIZEX], char maze[][SIZEX], Item& spot)
 { //initialise grid and place spot in middle
 	void setInitialMazeStructure(char maze[][SIZEX]);
 	void setSpotInitialCoordinates(Item& spot);
-	void updateGrid(char g[][SIZEX], const char m[][SIZEX], Item b);
+	void updateGrid(char g[][SIZEX],char m[][SIZEX], Item b);
 
 	setInitialMazeStructure(maze);		//initialise maze
 	setSpotInitialCoordinates(spot);
@@ -193,13 +195,15 @@ void updateLives(int& currentLives, int Change)
 }
 
 
-void updateGrid(char grid[][SIZEX], const char maze[][SIZEX], const Item spot)
+void updateGrid(char grid[][SIZEX], char maze[][SIZEX], const Item spot)
 { //update grid configuration after each move
 	void setMaze(char g[][SIZEX], const char b[][SIZEX]);
 	void placeItem(char g[][SIZEX], const Item spot);
+	void checkCollision(const Item spot, char maze[][SIZEX]);
 
 	setMaze(grid, maze);	//reset the empty maze configuration into grid
 	placeItem(grid, spot);	//set spot in grid
+	checkCollision(spot, maze); //Check for collisions with zombies or pills
 	//Set random 
 }
 
@@ -210,9 +214,22 @@ void setMaze(char grid[][SIZEX], const char maze[][SIZEX])
 			grid[row][col] = maze[row][col];
 }
 
+void checkCollision(const Item spot, char grid[][SIZEX])
+{ //Checks for collisions between zombies, pills and spot
+	if (grid[spot.y][spot.x] == PILL) //If collided with pill
+	{
+		grid[spot.y][spot.x] = TUNNEL; //Replace with tunnel
+	}
+}
+
 void placeItem(char g[][SIZEX], const Item item)
 { //place item at its new position in grid
 	g[item.y][item.x] = item.symbol;
+}
+
+void placeChar(char g[][SIZEX], const char Symbol, int x, int y)
+{ //place item at its new position in grid
+	g[y][x] = Symbol;
 }
 
 //---------------------------------------------------------------------------
@@ -223,6 +240,7 @@ void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, in
 	bool isArrowKey(const int k);
 	void setKeyDirection(int k, int& dx, int& dy);
 	void updateLives(int& currentLives, int Change);	
+	void placeChar(char g[][SIZEX], const char Symbol, int x, int y);
 	assert(isArrowKey(key));
 
 	//reset message to blank
@@ -252,8 +270,7 @@ void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, in
 		mess = "SPOT ATE A PILL";
 		spot.y += dy;	//go in that Y direction
 		spot.x += dx;	//go in that X direction
-		updateLives(Lives, 1);
-		g[spot.x][spot.y] = SPOT;
+		updateLives(Lives, 1);		
 		break;
 	}
 }
