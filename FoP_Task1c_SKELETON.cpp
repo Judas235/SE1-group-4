@@ -37,6 +37,7 @@ const char TUNNEL(' ');    	//tunnel
 const char WALL('#');    	//border
 const char HOLE('0');		//hole
 const char PILL('*');		//pill
+const char ZOMBIE('Z');		//Zombie
 //defining the command letters to move the spot on the maze
 const int  UP(72);			//up arrow
 const int  DOWN(80); 		//down arrow
@@ -58,7 +59,7 @@ int main()
 {
 	system("color 8a");
 	//function declarations (prototypes)
-	void initialiseGame(char g[][SIZEX], char m[][SIZEX], Item& spot);
+	void initialiseGame(char grid[][SIZEX], char maze[][SIZEX], Item& spot, Item Zoms[3]);
 	void paintGame(const char g[][SIZEX], string mess, int Lives);
 	bool wantsToQuit(const int key);
 	void updateLives(int& currentLives, int Change);
@@ -72,14 +73,18 @@ int main()
 	char grid[SIZEY][SIZEX];			//grid for display
 	char maze[SIZEY][SIZEX];			//structure of the maze
 	Item spot = { 0, 0, SPOT }; 		//spot's position and symbol
-	Item Holes[12];						//Holes array
+	Item Zombies[3];
 	string message("LET'S START...");	//current message to player
 	int Lives(3);
 
 	//action...
 	Seed();								//seed the random number generator
 	SetConsoleTitle("Spot and Zombies Game - FoP 2017-18");
-	initialiseGame(grid, maze, spot);	//initialise grid (incl. walls and spot)
+	Zombies[0] = { 1, 1, ZOMBIE };
+	Zombies[1] = { SIZEY - 2, 1, ZOMBIE };
+	Zombies[2] = { 1, SIZEX - 2, ZOMBIE };
+	Zombies[3] = { SIZEY - 2, SIZEX - 2, ZOMBIE };
+	initialiseGame(grid, maze, spot, Zombies);	//initialise grid (incl. walls and spot)
 	paintGame(grid, message, Lives);			//display game info, modified grid and messages
 	int key;							//current key selected by player
 	do {
@@ -111,13 +116,13 @@ int main()
 //----- initialise game state
 //---------------------------------------------------------------------------
 
-void initialiseGame(char grid[][SIZEX], char maze[][SIZEX], Item& spot)
+void initialiseGame(char grid[][SIZEX], char maze[][SIZEX], Item& spot, Item Zoms[3])
 { //initialise grid and place spot in middle
-	void setInitialMazeStructure(char maze[][SIZEX]);
+	void setInitialMazeStructure(char maze[][SIZEX], Item Zoms[3]);
 	void setSpotInitialCoordinates(Item& spot);
 	void updateGrid(char g[][SIZEX],char m[][SIZEX], Item b);
 
-	setInitialMazeStructure(maze);		//initialise maze
+	setInitialMazeStructure(maze, Zoms);		//initialise maze
 	setSpotInitialCoordinates(spot);
 	updateGrid(grid, maze, spot);		//prepare grid
 }
@@ -127,9 +132,9 @@ void setSpotInitialCoordinates(Item& spot)
 //TODO: Spot should not spwan on inner walls
 	spot.y = Random(SIZEY - 2);      //vertical coordinate in range [1..(SIZEY - 2)]
 	spot.x = Random(SIZEX - 2);      //horizontal coordinate in range [1..(SIZEX - 2)]
-} 
+}
 
-void setInitialMazeStructure(char maze[][SIZEX])
+void setInitialMazeStructure(char maze[][SIZEX], Item Zoms[3])
 { //set the position of the walls in the maze
 //TODO: initial maze configuration should be amended (size changed and inner walls removed)
   //initialise maze configuration
@@ -159,6 +164,10 @@ void setInitialMazeStructure(char maze[][SIZEX])
 			case '#': maze[row][col] = WALL; break;
 			case ' ': maze[row][col] = TUNNEL; break;
 			}
+	for (int count(0); count < 4; count++)
+	{
+		maze[Zoms[count].x][Zoms[count].y] = Zoms[count].symbol;
+	}
 	//Loop for each Hole that will be placed
 	for (int i = 0; i < 12; i++)
 	{
@@ -398,6 +407,10 @@ void paintGrid(const char g[][SIZEX])
 				break;
 			case SPOT:
 				SelectTextColour(clWhite);
+				cout << g[row][col];
+				break;
+			case ZOMBIE:
+				SelectTextColour(clGreen);
 				cout << g[row][col];
 				break;
 			}
