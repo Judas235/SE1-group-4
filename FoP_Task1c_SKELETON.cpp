@@ -69,9 +69,10 @@ int main()
 	void updateLives(int& currentLives, int Change);
 	bool isArrowKey(const int k);
 	int  getKeyPress();
-	void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives, vector<Item> Zombies);
+	void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives, vector<Item>& Zombies);
 	void updateGrid(char grid[][SIZEX], char maze[][SIZEX], const Item spot, vector<Item> Zombies);
 	void endProgram();
+	string PrintStartScreen();
 
 	//local variable declarations 
 	char grid[SIZEY][SIZEX];			//grid for display
@@ -90,7 +91,9 @@ int main()
 	Zombies.push_back({ ZomCoordinates[1][1], ZomCoordinates[0][1], ZOMBIE });
 	Zombies.push_back({ ZomCoordinates[1][2], ZomCoordinates[0][2], ZOMBIE });
 	Zombies.push_back({ ZomCoordinates[1][3], ZomCoordinates[0][3], ZOMBIE });
-	//
+
+	string Name = PrintStartScreen();
+
 	initialiseGame(grid, maze, spot, Zombies);	//initialise grid (incl. walls and spot)
 	paintGame(grid, message, Lives);			//display game info, modified grid and messages
 	int key;							//current key selected by player
@@ -250,13 +253,13 @@ void placeChar(char g[][SIZEX], const char Symbol, int x, int y)
 //---------------------------------------------------------------------------
 //----- move items on the grid
 //---------------------------------------------------------------------------
-void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives, vector<Item> Zombies) //Changed g to not a constant, so we can update the space to a tunnel
+void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives, vector<Item>& Zombies) //Changed g to not a constant, so we can update the space to a tunnel
 { //move spot in required direction
 	bool isArrowKey(const int k);
 	void setKeyDirection(int k, int& dx, int& dy);
 	void updateLives(int& currentLives, int Change);	
 	void placeChar(char g[][SIZEX], const char Symbol, int x, int y);
-	void updateZombieLocation(vector<Item> Zombies, int x, int y, Item Spot, char g[][SIZEX]);
+	void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g[][SIZEX]);
 	assert(isArrowKey(key));
 
 	//reset message to blank
@@ -297,7 +300,7 @@ void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, in
 	}
 	
 }
-void updateZombieLocation(vector<Item> Zombies, int x, int y, Item Spot, char g[][SIZEX])
+void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g[][SIZEX])
 {
 	for (int i(0); i < 4; i++) //Give zombies new coordinates
 	{
@@ -314,13 +317,14 @@ void updateZombieLocation(vector<Item> Zombies, int x, int y, Item Spot, char g[
 			{
 				Zombies[j].x = ZomCoordinates[1][j];
 				Zombies[j].y = ZomCoordinates[0][j];
-				Zombies[j].x = ZomCoordinates[1][k];
-				Zombies[j].y = ZomCoordinates[0][k];
+				Zombies[k].x = ZomCoordinates[1][k];
+				Zombies[k].y = ZomCoordinates[0][k];
 			}
 		}
 		if (g[Zombies[k].y][Zombies[k].x] == HOLE)
 		{
-			
+			Zombies[k].x = ZomCoordinates[1][k];
+			Zombies[k].y = ZomCoordinates[0][k];
 		}
 	}
 	for (int i(0); i < 4; i++) //When all collisions are detected, reset zombies
@@ -413,11 +417,11 @@ void paintGame(const char g[][SIZEX], string mess, int Lives)
 	showMessage(clWhite, clBlack, 40, 4, "TO QUIT ENTER 'Q'           ");
 
 	//print auxiliary messages if any
-	showMessage(clBlack, clWhite, 40, 8, mess);	//display current message
+	showMessage(clDarkGrey, clWhite, 40, 8, mess);	//display current message
 
 	//print current lives
 	string s = to_string(Lives);
-	showMessage(clBlack, clWhite, 40, 10, "Lives: " + s);
+	showMessage(clDarkGrey, clWhite, 40, 10, "Lives: " + s);
 
 //TODO: Show your course, your group number and names on screen
 
@@ -471,4 +475,35 @@ void endProgram()
 	showMessage(clGrey, clRed, 40, 11, "GAME OVER");
 	Gotoxy(40, 15);
 	system("pause");	//hold output screen until a keyboard key is hit
+}
+
+string PrintStartScreen()
+{
+	string NameToReturn;
+	showMessage(clBlack, clYellow, 40, 0, "DATE: " + GetDate());
+	showMessage(clBlack, clYellow, 40, 1, "TIME: " + GetTime());
+	showMessage(clBlack, clYellow, 40, 4, "TO MOVE USE KEYBOARD ARROWS ");
+	showMessage(clBlack, clYellow, 40, 5, "TO FREEZE ZOMBIES PRESS'F'");
+	showMessage(clBlack, clYellow, 40, 6, "TO KILL ZOMBIES PRESS'X'");
+	showMessage(clBlack, clYellow, 40, 7, "TO QUIT ENTER 'Q'");
+	showMessage(clBlack, clYellow, 10, 4, "--------------------");
+	showMessage(clBlack, clYellow, 10, 5, "| SPOT AND ZOMBIES |");
+	showMessage(clBlack, clYellow, 10, 6, "--------------------");
+	showMessage(clBlack, clYellow, 10, 10, "GROUP SE7 		 2017-18");
+	showMessage(clBlack, clYellow, 10, 11, "Harrison Deo		 26010941");
+	showMessage(clBlack, clYellow, 10, 12, "Ali Bajwa		 27018178");
+	showMessage(clBlack, clYellow, 10, 13, "Ismael Rabanipour      26017671");
+
+
+
+	showMessage(clBlack, clYellow, 10, 15, "Entre your name");
+
+	cin >> NameToReturn;
+	for (int i(0); i < 20; i++)
+	{
+		showMessage(clDarkGrey, clYellow, 0, i, "                                                                           ");
+		
+	}
+	return NameToReturn;
+
 }
