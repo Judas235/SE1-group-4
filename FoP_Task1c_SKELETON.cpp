@@ -32,20 +32,23 @@ using namespace std;
 //defining the size of the grid
 const int  SIZEX(25);    	//horizontal dimension
 const int  SIZEY(15);		//vertical dimension
-//defining symbols used for display of the grid and content
+							//defining symbols used for display of the grid and content
 const char SPOT('@');   	//spot
 const char TUNNEL(' ');    	//tunnel
 const char WALL('#');    	//border
 const char HOLE('0');		//hole
 const char PILL('*');		//pill
 const char ZOMBIE('Z');		//Zombie
-//defining the command letters to move the spot on the maze
+							//defining the command letters to move the spot on the maze
 const int  UP(72);			//up arrow
 const int  DOWN(80); 		//down arrow
 const int  RIGHT(77);		//right arrow
 const int  LEFT(75);		//left arrow
-//defining the other command letters
+							//defining the other command letters
 const char QUIT('Q');		//to end the game
+const char FREEZE('F');		//to freeze the zombies
+const char EAT('E');		//to eat the pills
+const char KILL('X');		//to kill the zombies 
 
 const int ZomCoordinates[2][4] = { { 1, SIZEY - 2, 1, SIZEY - 2 },
 { 1, 1, SIZEX - 2, SIZEX - 2 } };
@@ -68,11 +71,16 @@ int main()
 	bool wantsToQuit(const int key);
 	void updateLives(int& currentLives, int Change);
 	bool isArrowKey(const int k);
+	bool Freezing(const int k);
+	bool Eating(const int key);
+	bool KillZombies(const int key);
+
 	int  getKeyPress();
-	void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives, vector<Item>& Zombies);
-	void updateGrid(char grid[][SIZEX], char maze[][SIZEX], const Item spot, vector<Item> Zombies);
+	void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives, vector<Item>& Zombies, bool ZombiesFrozen, bool ZombiesVisible);
+	void updateGrid(char grid[][SIZEX], char maze[][SIZEX], const Item spot, vector<Item> Zombies, bool ZombiesVisible);
 	void endProgram();
 	string PrintStartScreen();
+	void RemoveAllOf(char maze[][SIZEX], char Symbol);
 
 	//local variable declarations 
 	char grid[SIZEY][SIZEX];			//grid for display
@@ -81,12 +89,13 @@ int main()
 	vector<Item> Zombies;
 	string message("LET'S START...");	//current message to player
 	int Lives(3);
-	
+	bool ZombiesFrozen = false;          //freezes the zombies
+	bool ZombiesVisible = true;          // used for making the zombies disappear
 
-	//action...
+										 //action...
 	Seed();								//seed the random number generator
 	SetConsoleTitle("Spot and Zombies Game - FoP 2017-18");
-	
+
 	Zombies.push_back({ ZomCoordinates[1][0], ZomCoordinates[0][0], ZOMBIE });
 	Zombies.push_back({ ZomCoordinates[1][1], ZomCoordinates[0][1], ZOMBIE });
 	Zombies.push_back({ ZomCoordinates[1][2], ZomCoordinates[0][2], ZOMBIE });
@@ -100,17 +109,41 @@ int main()
 	do {
 		//TODO: command letters should not be case sensitive
 		key = getKeyPress(); 	//read in  selected key: arrow or letter command
+		if (Freezing(key))
+			ZombiesFrozen = !ZombiesFrozen; // Set to the opposite state
+		if (Eating(key))
+		{
+			RemoveAllOf(maze, PILL);
+			updateGrid(grid, maze, spot, Zombies, ZombiesVisible);					//update grid information
+		}
+		if (KillZombies(key))  //When X key is pressed
+		{
+			ZombiesVisible = !ZombiesVisible; // Set to the opposite state
+			if (ZombiesVisible)
+			{
+				Zombies[0].x = ZomCoordinates[1][0]; //Reset all the zombie starting locations to respawn zombies.
+				Zombies[0].y = ZomCoordinates[0][0];
+				Zombies[1].x = ZomCoordinates[1][1];
+				Zombies[1].y = ZomCoordinates[0][1];
+				Zombies[2].x = ZomCoordinates[1][2];
+				Zombies[2].y = ZomCoordinates[0][2];
+				Zombies[3].x = ZomCoordinates[1][3];
+				Zombies[3].y = ZomCoordinates[0][3];
+
+			}
+			updateGrid(grid, maze, spot, Zombies, ZombiesVisible);					//update grid information
+		}
 		if (isArrowKey(key))
 		{
 			if (Lives <= 0)
-			{				
+			{
 				key = 'Q';
 			}
 			else
 			{
-				updateGameData(grid, spot, key, message, Lives, Zombies);//move spot in that direction
-				updateGrid(grid, maze, spot, Zombies);					//update grid information
-			}			
+				updateGameData(grid, spot, key, message, Lives, Zombies, ZombiesFrozen, ZombiesVisible);//move spot in that direction
+				updateGrid(grid, maze, spot, Zombies, ZombiesVisible);					//update grid information
+			}
 		}
 		else
 			message = "INVALID KEY!";	//set 'Invalid key' message
@@ -128,47 +161,47 @@ void initialiseGame(char grid[][SIZEX], char maze[][SIZEX], Item& spot, vector<I
 { //initialise grid and place spot in middle
 	void setInitialMazeStructure(char maze[][SIZEX], vector<Item> Zombies);
 	void setSpotInitialCoordinates(Item& spot);
-	void updateGrid(char grid[][SIZEX], char maze[][SIZEX], const Item spot, vector<Item> Zombies);
+	void updateGrid(char grid[][SIZEX], char maze[][SIZEX], const Item spot, vector<Item> Zombies, bool ZombiesVisible);
 
 	setInitialMazeStructure(maze, Zombies);		//initialise maze
 	setSpotInitialCoordinates(spot);
-	updateGrid(grid, maze, spot, Zombies);		//prepare grid
+	updateGrid(grid, maze, spot, Zombies, true);		//prepare grid
 }
 
 void setSpotInitialCoordinates(Item& spot)
 { //set spot coordinates inside the grid at random at beginning of game
-//TODO: Spot should not spwan on inner walls
+  //TODO: Spot should not spwan on inner walls
 	spot.y = Random(SIZEY - 2);      //vertical coordinate in range [1..(SIZEY - 2)]
 	spot.x = Random(SIZEX - 2);      //horizontal coordinate in range [1..(SIZEX - 2)]
 }
 
 void setInitialMazeStructure(char maze[][SIZEX], vector<Item> Zombies)
 { //set the position of the walls in the maze
-//TODO: initial maze configuration should be amended (size changed and inner walls removed)
+  //TODO: initial maze configuration should be amended (size changed and inner walls removed)
   //initialise maze configuration
 	char initialMaze[SIZEY][SIZEX] 	//local array to store the maze structure
 		= { { '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
-		{ '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#' } };		
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#' },
+	{ '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#' } };
 	//with '#' for wall, ' ' for tunnel, etc. 
 	//copy into maze structure with appropriate symbols
 	for (int row(0); row < SIZEY; ++row)
 		for (int col(0); col < SIZEX; ++col)
 			switch (initialMaze[row][col])
 			{
-			//not a direct copy, in case the symbols used change
+				//not a direct copy, in case the symbols used change
 			case '#': maze[row][col] = WALL; break;
 			case ' ': maze[row][col] = TUNNEL; break;
 			}
@@ -177,11 +210,11 @@ void setInitialMazeStructure(char maze[][SIZEX], vector<Item> Zombies)
 	{
 		int randomx = Random(SIZEX - 2);//get a random x value
 		int randomy = Random(SIZEY - 2);//get a random y value
-		while(maze[randomy][randomx] != TUNNEL)//Make sure the random X,y are over a tunnel and nothing else
+		while (maze[randomy][randomx] != TUNNEL)//Make sure the random X,y are over a tunnel and nothing else
 		{
 			randomx = Random(SIZEX - 2);
 			randomy = Random(SIZEY - 2);
-		}		
+		}
 		maze[randomy][randomx] = HOLE; //when it is above a tunnel, replace with a hole
 	}
 	//Loop through for each pill
@@ -208,7 +241,7 @@ void updateLives(int& currentLives, int Change)
 }
 
 
-void updateGrid(char grid[][SIZEX], char maze[][SIZEX], const Item spot, vector<Item> Zombies)
+void updateGrid(char grid[][SIZEX], char maze[][SIZEX], const Item spot, vector<Item> Zombies, bool ZombiesVisible)
 { //update grid configuration after each move
 	void setMaze(char g[][SIZEX], const char b[][SIZEX]);
 	void placeItem(char g[][SIZEX], const Item spot);
@@ -216,14 +249,17 @@ void updateGrid(char grid[][SIZEX], char maze[][SIZEX], const Item spot, vector<
 
 	setMaze(grid, maze);	//reset the empty maze configuration into grid
 	placeItem(grid, spot);	//set spot in grid
-	
-	for (int i(0); i < 4; i++)
+
+	if (ZombiesVisible)
 	{
-		placeItem(grid, Zombies[i]);
+		for (int i(0); i < Zombies.size(); i++)
+		{
+			placeItem(grid, Zombies[i]);     //Place the zombies in the corners
+		}
 	}
 
 	checkCollision(spot, maze); //Check for collisions with zombies or pills
-	//Set random 
+								//Set random 
 }
 void setMaze(char grid[][SIZEX], const char maze[][SIZEX])
 { //reset the empty/fixed maze configuration into grid
@@ -253,22 +289,32 @@ void placeChar(char g[][SIZEX], const char Symbol, int x, int y)
 //---------------------------------------------------------------------------
 //----- move items on the grid
 //---------------------------------------------------------------------------
-void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives, vector<Item>& Zombies) //Changed g to not a constant, so we can update the space to a tunnel
+void updateGameData(char g[][SIZEX], Item& spot, int key, string& mess, int& Lives, vector<Item>& Zombies, bool ZombiesFrozen, bool ZombiesVisible) //Changed g to not a constant, so we can update the space to a tunnel
 { //move spot in required direction
 	bool isArrowKey(const int k);
 	void setKeyDirection(int k, int& dx, int& dy);
-	void updateLives(int& currentLives, int Change);	
+	void updateLives(int& currentLives, int Change);
 	void placeChar(char g[][SIZEX], const char Symbol, int x, int y);
 	void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g[][SIZEX]);
 	assert(isArrowKey(key));
-
+	bool Freezing(const int key);
+	int  getKeyPress();
+	bool Eating(const int key);
 	//reset message to blank
 	mess = "                                         ";		//reset message to blank
 
-	//calculate direction of movement for given key
+															//calculate direction of movement for given key
 	int dx(0), dy(0);
 	setKeyDirection(key, dx, dy);
-	updateZombieLocation(Zombies, dy, dx, spot, g);
+
+
+	if (!ZombiesFrozen && ZombiesVisible)
+	{
+		updateZombieLocation(Zombies, dy, dx, spot, g);  //updates the zombies on the grid when F or X is pressed.
+	}
+
+
+
 	//check new target position in grid and update game data (incl. spot coordinates) if move is possible
 	switch (g[spot.y + dy][spot.x + dx])
 	{			//...depending on what's on the target position in grid...
@@ -298,7 +344,7 @@ void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, in
 		updateLives(Lives, -1);
 		break;
 	}
-	
+
 }
 void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g[][SIZEX])
 {
@@ -350,7 +396,7 @@ void setKeyDirection(const int key, int& dx, int& dy)
 		dy = 0;
 		break;
 	case UP:        //when UP arrow pressed...
-		dx = 0;		
+		dx = 0;
 		dy = -1;	//Decrease the Y coordinate
 		break;
 	case DOWN:		//when the DOWN arrow pressed...
@@ -372,14 +418,37 @@ int getKeyPress()
 
 bool isArrowKey(const int key)
 {	//check if the key pressed is an arrow key (also accept 'K', 'M', 'H' and 'P')
-//TODO: UP and DOWN arrow keys should be detected
+	//TODO: UP and DOWN arrow keys should be detected
 	return (key == LEFT) || (key == RIGHT) || (key == UP) || (key == DOWN);
 }
 bool wantsToQuit(const int key)
 {	//check if the user wants to quit (when key is 'Q' or 'q')
 	return key == QUIT;
 }
+bool Freezing(const int key)
+{	//check if the user wants to freeze the zombies(when key is 'F')
+	return key == FREEZE;
+}
+bool Eating(const int key)
+{	//check if the user wants to eat pills (when key is 'E')
+	return key == EAT;
+}
+bool KillZombies(const int key)
+{	//check if the user wants to kill zombies (when key is 'X')
+	return key == KILL;
+}
+void RemoveAllOf(char maze[][SIZEX], char Symbol)  //Replaces zombies with the tunnel when killed
+{
+	for (int row(0); row < SIZEY; ++row)
+		for (int col(0); col < SIZEX; ++col)
+		{
+			{
+				if (maze[row][col] == Symbol)
+					maze[row][col] = TUNNEL;
+			}
+		}
 
+}
 //---------------------------------------------------------------------------
 //----- display info on screen
 //---------------------------------------------------------------------------
@@ -390,7 +459,7 @@ string tostring(int x)
 	os << x;
 	return os.str();
 }
-string tostring(char x) 
+string tostring(char x)
 {	//convert a char to a string
 	std::ostringstream os;
 	os << x;
@@ -413,17 +482,20 @@ void paintGame(const char g[][SIZEX], string mess, int Lives)
 	showMessage(clGrey, clYellow, 40, 0, GetDate() + GetTime());
 
 	//display menu options available
-	showMessage(clWhite, clBlack, 40, 3, "TO MOVE USE KEYBOARD ARROWS ");
-	showMessage(clWhite, clBlack, 40, 4, "TO QUIT ENTER 'Q'           ");
+	showMessage(clGrey, clYellow, 40, 3, "TO MOVE USE KEYBOARD ARROWS ");
+	showMessage(clGrey, clYellow, 40, 4, "TO FREEZE ZOMBIES ENTER 'F' ");
+	showMessage(clGrey, clYellow, 40, 5, "TO KILL ZOMBIES ENTER 'X'   ");
+	showMessage(clGrey, clYellow, 40, 6, "TO EAT PILLS ENTER 'E'      ");
+	showMessage(clGrey, clYellow, 40, 7, "TO QUIT ENTER 'Q'           ");
 
 	//print auxiliary messages if any
 	showMessage(clDarkGrey, clWhite, 40, 8, mess);	//display current message
 
-	//print current lives
+													//print current lives
 	string s = to_string(Lives);
 	showMessage(clDarkGrey, clWhite, 40, 10, "Lives: " + s);
 
-//TODO: Show your course, your group number and names on screen
+	//TODO: Show your course, your group number and names on screen
 
 	//display grid contents
 	paintGrid(g);
@@ -463,7 +535,7 @@ void paintGrid(const char g[][SIZEX])
 				cout << g[row][col];
 				break;
 			}
-			//cout << g[row][col];	//output cell content
+		//cout << g[row][col];	//output cell content
 		cout << endl;
 	}
 }
@@ -471,7 +543,7 @@ void paintGrid(const char g[][SIZEX])
 void endProgram()
 {
 	void showMessage(const WORD backColour, const WORD textColour, int x, int y, const string message);
-	showMessage(clRed, clYellow, 40, 8, "");	
+	showMessage(clRed, clYellow, 40, 8, "");
 	showMessage(clGrey, clRed, 40, 11, "GAME OVER");
 	Gotoxy(40, 15);
 	system("pause");	//hold output screen until a keyboard key is hit
@@ -496,13 +568,13 @@ string PrintStartScreen()
 
 
 
-	showMessage(clBlack, clYellow, 10, 15, "Entre your name");
+	showMessage(clBlack, clYellow, 10, 15, "Enter your name");
 
 	cin >> NameToReturn;
 	for (int i(0); i < 20; i++)
 	{
 		showMessage(clDarkGrey, clYellow, 0, i, "                                                                           ");
-		
+
 	}
 	return NameToReturn;
 
