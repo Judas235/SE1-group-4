@@ -18,6 +18,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <fstream>
 using namespace std;
 
 //include our own libraries
@@ -48,7 +49,9 @@ const int  LEFT(75);		//left arrow
 const char QUIT('Q');		//to end the game
 const char FREEZE('F');		//to freeze the zombies
 const char EAT('E');		//to eat the pills
-const char KILL('X');		//to kill the zombies 
+const char KILL('X');		//to kill the zombies
+
+const char EOFM('/');
 
 const int ZomCoordinates[2][4] = { { 1, SIZEY - 2, 1, SIZEY - 2 },
 { 1, 1, SIZEX - 2, SIZEX - 2 } };
@@ -67,16 +70,19 @@ int main()
 	system("color 8a");
 	//function declarations (prototypes)
 	void initialiseGame(char grid[][SIZEX], char maze[][SIZEX], Item& spot, vector<Item> Zombies);
-	void paintGame(const char g[][SIZEX], string mess, int Lives);
+	void paintGame(const char g[][SIZEX], string mess, int Lives, string name, int PreviousBest);
 	bool wantsToQuit(const int key);
 	void updateLives(int& currentLives, int Change);
 	bool isArrowKey(const int k);
 	bool Freezing(const int k);
 	bool Eating(const int key);
 	bool KillZombies(const int key);
+	void writeScoreToFile(string name, int Score);
+	int getPreviousScore(string name);
+	void updatePillCount(int& PillCount, int Amount);
 
 	int  getKeyPress();
-	void updateGameData(char g[][SIZEX], Item& spot, const int key, string& mess, int& Lives, vector<Item>& Zombies, bool ZombiesFrozen, bool ZombiesVisible);
+	void updateGameData(char g[][SIZEX], Item& spot, int key, string& mess, int& Lives, vector<Item>& Zombies, bool ZombiesFrozen, bool ZombiesVisible, int& pillCount);
 	void updateGrid(char grid[][SIZEX], char maze[][SIZEX], const Item spot, vector<Item> Zombies, bool ZombiesVisible);
 	void endProgram();
 	string PrintStartScreen();
@@ -89,9 +95,11 @@ int main()
 	vector<Item> Zombies;
 	string message("LET'S START...");	//current message to player
 	int Lives(3);
+	int playerHighestScore(-1);
 	bool ZombiesFrozen = false;          //freezes the zombies
 	bool ZombiesVisible = true;          // used for making the zombies disappear
-
+	bool cheatsUsed(false);				//Keeps track of wheather the player used cheats or not
+	int pillCount (8);
 										 //action...
 	Seed();								//seed the random number generator
 	SetConsoleTitle("Spot and Zombies Game - FoP 2017-18");
@@ -102,23 +110,37 @@ int main()
 	Zombies.push_back({ ZomCoordinates[1][3], ZomCoordinates[0][3], ZOMBIE });
 
 	string Name = PrintStartScreen();
-
+	playerHighestScore = getPreviousScore(Name);
+	if (playerHighestScore == -10)
+	{
+		writeScoreToFile(Name, -1);
+	}
+	
 	initialiseGame(grid, maze, spot, Zombies);	//initialise grid (incl. walls and spot)
-	paintGame(grid, message, Lives);			//display game info, modified grid and messages
+	paintGame(grid, message, Lives, Name, playerHighestScore);			//display game info, modified grid and messages
 	int key;							//current key selected by player
 	do {
 		//TODO: command letters should not be case sensitive
 		key = getKeyPress(); 	//read in  selected key: arrow or letter command
+		//Freeze Key
 		if (Freezing(key))
-			ZombiesFrozen = !ZombiesFrozen; // Set to the opposite state
+		{
+			ZombiesFrozen = !ZombiesFrozen;  // Set to the opposite state
+			//cheatsUsed = true;
+		}
+		//Eat pills key
 		if (Eating(key))
 		{
 			RemoveAllOf(maze, PILL);
-			updateGrid(grid, maze, spot, Zombies, ZombiesVisible);					//update grid information
+			updateGrid(grid, maze, spot, Zombies, ZombiesVisible); //update grid information
+			updatePillCount(pillCount, -(pillCount));
+			cheatsUsed = true;
 		}
+		//Kill Zombies Key
 		if (KillZombies(key))  //When X key is pressed
 		{
 			ZombiesVisible = !ZombiesVisible; // Set to the opposite state
+			cheatsUsed = true;
 			if (ZombiesVisible)
 			{
 				Zombies[0].x = ZomCoordinates[1][0]; //Reset all the zombie starting locations to respawn zombies.
@@ -135,19 +157,30 @@ int main()
 		}
 		if (isArrowKey(key))
 		{
-			if (Lives <= 0)
+			if ((Lives <= 0) || (pillCount == 0))
 			{
-				key = 'Q';
+				if (cheatsUsed)
+				{
+					key = 'Q';
+				}
+				else
+				{
+					if (Lives > playerHighestScore)
+					{
+						writeScoreToFile(Name, Lives);
+						key = 'Q';
+					}
+				}				
 			}
 			else
 			{
-				updateGameData(grid, spot, key, message, Lives, Zombies, ZombiesFrozen, ZombiesVisible);//move spot in that direction
+				updateGameData(grid, spot, key, message, Lives, Zombies, ZombiesFrozen, ZombiesVisible, pillCount);//move spot in that direction
 				updateGrid(grid, maze, spot, Zombies, ZombiesVisible);					//update grid information
 			}
 		}
 		else
 			message = "INVALID KEY!";	//set 'Invalid key' message
-		paintGame(grid, message, Lives);		//display game info, modified grid and messages
+		paintGame(grid, message, Lives, Name, playerHighestScore);		//display game info, modified grid and messages
 	} while (!wantsToQuit(key));		//while user does not want to quit
 	endProgram();						//display final message
 	return 0;
@@ -208,12 +241,12 @@ void setInitialMazeStructure(char maze[][SIZEX], vector<Item> Zombies)
 	//Loop for each Hole that will be placed
 	for (int i = 0; i < 12; i++)
 	{
-		int randomx = Random(SIZEX - 2);//get a random x value
-		int randomy = Random(SIZEY - 2);//get a random y value
+		int randomx = 2 + Random(SIZEX - 2);//get a random x value
+		int randomy = 2 + Random(SIZEY - 2);//get a random y value
 		while (maze[randomy][randomx] != TUNNEL)//Make sure the random X,y are over a tunnel and nothing else
 		{
-			randomx = Random(SIZEX - 2);
-			randomy = Random(SIZEY - 2);
+			randomx = 2 + Random(SIZEX - 4);
+			randomy = 2 + Random(SIZEY - 2);
 		}
 		maze[randomy][randomx] = HOLE; //when it is above a tunnel, replace with a hole
 	}
@@ -234,6 +267,10 @@ void setInitialMazeStructure(char maze[][SIZEX], vector<Item> Zombies)
 //---------------------------------------------------------------------------
 //----- update grid state
 //---------------------------------------------------------------------------
+void updatePillCount(int& PillCount, int Amount)
+{
+	PillCount += Amount;
+}
 
 void updateLives(int& currentLives, int Change)
 {
@@ -289,61 +326,60 @@ void placeChar(char g[][SIZEX], const char Symbol, int x, int y)
 //---------------------------------------------------------------------------
 //----- move items on the grid
 //---------------------------------------------------------------------------
-void updateGameData(char g[][SIZEX], Item& spot, int key, string& mess, int& Lives, vector<Item>& Zombies, bool ZombiesFrozen, bool ZombiesVisible) //Changed g to not a constant, so we can update the space to a tunnel
+void updateGameData(char g[][SIZEX], Item& spot, int key, string& mess, int& Lives, vector<Item>& Zombies, bool ZombiesFrozen, bool ZombiesVisible, int& pillCount) //Changed g to not a constant, so we can update the space to a tunnel
 { //move spot in required direction
-	bool isArrowKey(const int k);
-	void setKeyDirection(int k, int& dx, int& dy);
-	void updateLives(int& currentLives, int Change);
-	void placeChar(char g[][SIZEX], const char Symbol, int x, int y);
-	void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g[][SIZEX]);
-	assert(isArrowKey(key));
-	bool Freezing(const int key);
-	int  getKeyPress();
-	bool Eating(const int key);
-	//reset message to blank
-	mess = "                                         ";		//reset message to blank
+bool isArrowKey(const int k);
+void setKeyDirection(int k, int& dx, int& dy);
+void updateLives(int& currentLives, int Change);
+void placeChar(char g[][SIZEX], const char Symbol, int x, int y);
+void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g[][SIZEX]);
+assert(isArrowKey(key));
+bool Freezing(const int key);
+int  getKeyPress();
+bool Eating(const int key);
+void updatePillCount(int& PillCount, int Amount);
+//reset message to blank
+mess = "                                         ";		//reset message to blank
 
-															//calculate direction of movement for given key
-	int dx(0), dy(0);
-	setKeyDirection(key, dx, dy);
+														//calculate direction of movement for given key
+int dx(0), dy(0);
+setKeyDirection(key, dx, dy);
 
+if (!ZombiesFrozen && ZombiesVisible)
+{
+	updateZombieLocation(Zombies, dy, dx, spot, g);  //updates the zombies on the grid when F or X is pressed.
+}
 
-	if (!ZombiesFrozen && ZombiesVisible)
-	{
-		updateZombieLocation(Zombies, dy, dx, spot, g);  //updates the zombies on the grid when F or X is pressed.
-	}
-
-
-
-	//check new target position in grid and update game data (incl. spot coordinates) if move is possible
-	switch (g[spot.y + dy][spot.x + dx])
-	{			//...depending on what's on the target position in grid...
-	case TUNNEL:		//can move
-		spot.y += dy;	//go in that Y direction
-		spot.x += dx;	//go in that X direction
-		break;
-	case WALL:  		//hit a wall and stay there
-		mess = "CANNOT GO THERE!";
-		break;
-	case HOLE:
-		mess = "SPOT FELL INTO A HOLE";
-		spot.y += dy;	//go in that Y direction
-		spot.x += dx;	//go in that X direction
-		updateLives(Lives, -1);
-		break;
-	case PILL:
-		mess = "SPOT ATE A PILL";
-		spot.y += dy;	//go in that Y direction
-		spot.x += dx;	//go in that X direction
-		updateLives(Lives, 1);
-		break;
-	case ZOMBIE:
-		mess = "SPOT HIT A ZOMBIE!";
-		spot.y += dy;
-		spot.x += dx;
-		updateLives(Lives, -1);
-		break;
-	}
+//check new target position in grid and update game data (incl. spot coordinates) if move is possible
+switch (g[spot.y + dy][spot.x + dx])
+{			//...depending on what's on the target position in grid...
+case TUNNEL:		//can move
+	spot.y += dy;	//go in that Y direction
+	spot.x += dx;	//go in that X direction
+	break;
+case WALL:  		//hit a wall and stay there
+	mess = "CANNOT GO THERE!";
+	break;
+case HOLE:
+	mess = "SPOT FELL INTO A HOLE";
+	spot.y += dy;	//go in that Y direction
+	spot.x += dx;	//go in that X direction
+	updateLives(Lives, -1);
+	break;
+case PILL:
+	mess = "SPOT ATE A PILL";
+	spot.y += dy;	//go in that Y direction
+	spot.x += dx;	//go in that X direction
+	updateLives(Lives, 1);
+	updatePillCount(pillCount, -1);
+	break;
+case ZOMBIE:
+	mess = "SPOT HIT A ZOMBIE!";
+	spot.y += dy;
+	spot.x += dx;
+	updateLives(Lives, -1);
+	break;
+}
 
 }
 void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g[][SIZEX])
@@ -376,6 +412,36 @@ void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g
 	for (int i(0); i < 4; i++) //When all collisions are detected, reset zombies
 	{
 		g[Zombies[i].y][Zombies[i].x] = ZOMBIE;
+	}
+}
+//---------------------------------------------------------------------------
+//----- Text File Functions
+//---------------------------------------------------------------------------
+void writeScoreToFile(string name, int Score)
+{
+	fstream fio;
+	string filename = name + ".txt";
+	fio.open(filename, ios::out);
+	fio << Score << EOFM;
+	fio.close();
+}
+int getPreviousScore(string name)
+{
+	ifstream fin(name + ".txt");
+	if (fin.fail())
+	{
+		return -10;
+	}
+	else
+	{
+		char indivCharacter;
+		string tempscore;
+		while ((indivCharacter = fin.get()) != EOFM)
+		{
+			tempscore += indivCharacter;
+		}
+		int score = atoi(tempscore.substr(0, 2).c_str());
+		return score;
 	}
 }
 //---------------------------------------------------------------------------
@@ -472,7 +538,7 @@ void showMessage(const WORD backColour, const WORD textColour, int x, int y, con
 	SelectTextColour(textColour);
 	cout << message;
 }
-void paintGame(const char g[][SIZEX], string mess, int Lives)
+void paintGame(const char g[][SIZEX], string mess, int Lives, string name, int PreviousBest)
 { //display game title, messages, maze, spot and other items on screen
 	string tostring(char x);
 	void showMessage(const WORD backColour, const WORD textColour, int x, int y, const string message);
@@ -491,9 +557,11 @@ void paintGame(const char g[][SIZEX], string mess, int Lives)
 	//print auxiliary messages if any
 	showMessage(clDarkGrey, clWhite, 40, 8, mess);	//display current message
 
-													//print current lives
-	string s = to_string(Lives);
-	showMessage(clDarkGrey, clWhite, 40, 10, "Lives: " + s);
+	showMessage(clDarkGrey, clWhite, 40, 9, name);	
+	showMessage(clDarkGrey, clWhite, 40, 10, "Previous Score: " + to_string(PreviousBest));
+													
+	string s = to_string(Lives); //print current lives
+	showMessage(clDarkGrey, clWhite, 40, 12, "Lives: " + s);
 
 	//TODO: Show your course, your group number and names on screen
 
