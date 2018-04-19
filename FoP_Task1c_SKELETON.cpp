@@ -59,6 +59,7 @@ const int ZomCoordinates[2][4] = { { 1, SIZEY - 2, 1, SIZEY - 2 },
 struct Item {
 	int x, y;
 	char symbol;
+	int lives;
 };
 
 //---------------------------------------------------------------------------
@@ -82,7 +83,7 @@ int main()
 	void updatePillCount(int& PillCount, int Amount);
 
 	int  getKeyPress();
-	void updateGameData(char g[][SIZEX], Item& spot, int key, string& mess, int& Lives, vector<Item>& Zombies, bool ZombiesFrozen, bool ZombiesVisible, int& pillCount);
+	void updateGameData(char g[][SIZEX], char maze[][SIZEX], Item& spot, int key, string& mess, int& Lives, vector<Item>& Zombies, bool ZombiesFrozen, bool ZombiesVisible, int& pillCount);
 	void updateGrid(char grid[][SIZEX], char maze[][SIZEX], const Item spot, vector<Item> Zombies, bool ZombiesVisible);
 	void endProgram();
 	string PrintStartScreen();
@@ -91,10 +92,9 @@ int main()
 	//local variable declarations 
 	char grid[SIZEY][SIZEX];			//grid for display
 	char maze[SIZEY][SIZEX];			//structure of the maze
-	Item spot = { 0, 0, SPOT }; 		//spot's position and symbol
+	Item spot = { 0, 0, SPOT,3 }; 		//spot's position and symbol
 	vector<Item> Zombies;
 	string message("LET'S START...");	//current message to player
-	int Lives(3);
 	int playerHighestScore(-1);
 	bool ZombiesFrozen = false;          //freezes the zombies
 	bool ZombiesVisible = true;          // used for making the zombies disappear
@@ -104,20 +104,20 @@ int main()
 	Seed();								//seed the random number generator
 	SetConsoleTitle("Spot and Zombies Game - FoP 2017-18");
 
-	Zombies.push_back({ ZomCoordinates[1][0], ZomCoordinates[0][0], ZOMBIE });
-	Zombies.push_back({ ZomCoordinates[1][1], ZomCoordinates[0][1], ZOMBIE });
-	Zombies.push_back({ ZomCoordinates[1][2], ZomCoordinates[0][2], ZOMBIE });
-	Zombies.push_back({ ZomCoordinates[1][3], ZomCoordinates[0][3], ZOMBIE });
+	Zombies.push_back({ ZomCoordinates[1][0], ZomCoordinates[0][0], ZOMBIE, 1 });
+	Zombies.push_back({ ZomCoordinates[1][1], ZomCoordinates[0][1], ZOMBIE , 1 });
+	Zombies.push_back({ ZomCoordinates[1][2], ZomCoordinates[0][2], ZOMBIE , 1 });
+	Zombies.push_back({ ZomCoordinates[1][3], ZomCoordinates[0][3], ZOMBIE, 1 });
 
 	string Name = PrintStartScreen();
 	playerHighestScore = getPreviousScore(Name);
-	if (playerHighestScore == -10)
+	if (playerHighestScore == -1)
 	{
 		writeScoreToFile(Name, -1);
 	}
 	
 	initialiseGame(grid, maze, spot, Zombies);	//initialise grid (incl. walls and spot)
-	paintGame(grid, message, Lives, Name, playerHighestScore);			//display game info, modified grid and messages
+	paintGame(grid, message, spot.lives, Name, playerHighestScore);			//display game info, modified grid and messages
 	int key;							//current key selected by player
 	do {
 		//TODO: command letters should not be case sensitive
@@ -157,7 +157,7 @@ int main()
 		}
 		if (isArrowKey(key))
 		{
-			if ((Lives <= 0) || (pillCount == 0))
+			if ((spot.lives <= 0) || (pillCount == 0))
 			{
 				if (cheatsUsed)
 				{
@@ -165,22 +165,26 @@ int main()
 				}
 				else
 				{
-					if (Lives > playerHighestScore)
+					if (spot.lives > playerHighestScore)
 					{
-						writeScoreToFile(Name, Lives);
+						writeScoreToFile(Name, spot.lives);
+						key = 'Q';
+					}
+					else
+					{
 						key = 'Q';
 					}
 				}				
 			}
 			else
 			{
-				updateGameData(grid, spot, key, message, Lives, Zombies, ZombiesFrozen, ZombiesVisible, pillCount);//move spot in that direction
+				updateGameData(grid, maze, spot, key, message, spot.lives, Zombies, ZombiesFrozen, ZombiesVisible, pillCount);//move spot in that direction
 				updateGrid(grid, maze, spot, Zombies, ZombiesVisible);					//update grid information
 			}
 		}
 		else
 			message = "INVALID KEY!";	//set 'Invalid key' message
-		paintGame(grid, message, Lives, Name, playerHighestScore);		//display game info, modified grid and messages
+		paintGame(grid, message, spot.lives, Name, playerHighestScore);		//display game info, modified grid and messages
 	} while (!wantsToQuit(key));		//while user does not want to quit
 	endProgram();						//display final message
 	return 0;
@@ -326,13 +330,13 @@ void placeChar(char g[][SIZEX], const char Symbol, int x, int y)
 //---------------------------------------------------------------------------
 //----- move items on the grid
 //---------------------------------------------------------------------------
-void updateGameData(char g[][SIZEX], Item& spot, int key, string& mess, int& Lives, vector<Item>& Zombies, bool ZombiesFrozen, bool ZombiesVisible, int& pillCount) //Changed g to not a constant, so we can update the space to a tunnel
+void updateGameData(char g[][SIZEX], char maze[][SIZEX], Item& spot, int key, string& mess, int& Lives, vector<Item>& Zombies, bool ZombiesFrozen, bool ZombiesVisible, int& pillCount) //Changed g to not a constant, so we can update the space to a tunnel
 { //move spot in required direction
 bool isArrowKey(const int k);
 void setKeyDirection(int k, int& dx, int& dy);
 void updateLives(int& currentLives, int Change);
 void placeChar(char g[][SIZEX], const char Symbol, int x, int y);
-void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g[][SIZEX]);
+void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g[][SIZEX], char maze[][SIZEX]);
 assert(isArrowKey(key));
 bool Freezing(const int key);
 int  getKeyPress();
@@ -344,11 +348,6 @@ mess = "                                         ";		//reset message to blank
 														//calculate direction of movement for given key
 int dx(0), dy(0);
 setKeyDirection(key, dx, dy);
-
-if (!ZombiesFrozen && ZombiesVisible)
-{
-	updateZombieLocation(Zombies, dy, dx, spot, g);  //updates the zombies on the grid when F or X is pressed.
-}
 
 //check new target position in grid and update game data (incl. spot coordinates) if move is possible
 switch (g[spot.y + dy][spot.x + dx])
@@ -381,19 +380,34 @@ case ZOMBIE:
 	break;
 }
 
-}
-void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g[][SIZEX])
+if (!ZombiesFrozen && ZombiesVisible)
 {
-	for (int i(0); i < 4; i++) //Give zombies new coordinates
+	updateZombieLocation(Zombies, dy, dx, spot, g, maze);  //updates the zombies on the grid when F or X is pressed.
+}
+
+for (int i = 0; i < Zombies.size(); i++)
+{
+	if ((Zombies[i].x == spot.x) && (Zombies[i].y == spot.y))
 	{
-		if (Zombies[i].x < Spot.x) Zombies[i].x += 1;//if zombie is to left of spot
-		else if (Zombies[i].x > Spot.x) Zombies[i].x -= 1;//If zombie is to the right of spot
-		if (Zombies[i].y < Spot.y) Zombies[i].y += 1; //If zombie is below spot
-		else if (Zombies[i].y > Spot.y) Zombies[i].y -= 1; //if zombie is above spot		
+		Zombies[i].x = ZomCoordinates[1][i];
+		Zombies[i].y = ZomCoordinates[0][i];
+		updateLives(Lives, -1);
 	}
-	for (int k(0); k < 4; k++) //Loop through all zombies checking for collisions
+}
+}
+void updateZombieLocation(vector<Item>& Zombies, int dx, int dy, Item Spot, char g[][SIZEX], char maze[][SIZEX])
+{
+	void RemoveOneOf(char maze[][SIZEX], Item itemToRemove);
+	for (int i(0); i < Zombies.size(); i++) //Give zombies new coordinates
 	{
-		for (int j(0); j < 4; j++)
+		if (Zombies[i].x < (Spot.x)) Zombies[i].x += 1;//if zombie is to left of spot
+		else if (Zombies[i].x > (Spot.x)) Zombies[i].x -= 1;//If zombie is to the right of spot
+		if (Zombies[i].y < (Spot.y)) Zombies[i].y += 1; //If zombie is below spot
+		else if (Zombies[i].y > (Spot.y)) Zombies[i].y -= 1; //if zombie is above spot		
+	}
+	for (int k(0); k < Zombies.size(); k++) //Loop through all zombies checking for collisions
+	{
+		for (int j(0); j < Zombies.size(); j++)
 		{
 			if ((Zombies[j].x == Zombies[k].x) && (Zombies[j].y == Zombies[k].y) && (j != k))
 			{
@@ -402,14 +416,19 @@ void updateZombieLocation(vector<Item>& Zombies, int x, int y, Item Spot, char g
 				Zombies[k].x = ZomCoordinates[1][k];
 				Zombies[k].y = ZomCoordinates[0][k];
 			}
-		}
+		}		
 		if (g[Zombies[k].y][Zombies[k].x] == HOLE)
 		{
+			Zombies[k].lives -=1;			
 			Zombies[k].x = ZomCoordinates[1][k];
 			Zombies[k].y = ZomCoordinates[0][k];
 		}
+		if (Zombies[k].lives <= 0)
+		{
+			Zombies.erase(Zombies.begin() + k);
+		}
 	}
-	for (int i(0); i < 4; i++) //When all collisions are detected, reset zombies
+	for (int i(0); i < Zombies.size(); i++) //When all collisions are detected, reset zombies
 	{
 		g[Zombies[i].y][Zombies[i].x] = ZOMBIE;
 	}
@@ -430,7 +449,7 @@ int getPreviousScore(string name)
 	ifstream fin(name + ".txt");
 	if (fin.fail())
 	{
-		return -10;
+		return -1;
 	}
 	else
 	{
@@ -513,6 +532,12 @@ void RemoveAllOf(char maze[][SIZEX], char Symbol)  //Replaces zombies with the t
 					maze[row][col] = TUNNEL;
 			}
 		}
+
+}
+void RemoveOneOf(char maze[][SIZEX], Item itemToRemove)  //Replaces zombies with the tunnel when killed
+{
+	maze[itemToRemove.y][itemToRemove.x] = HOLE;
+		
 
 }
 //---------------------------------------------------------------------------
